@@ -9,36 +9,57 @@ import {
   RotateCcw,
   X,
 } from 'lucide-react';
-import { QUIZ_QUESTIONS } from '@/src/data/quizzes';
-import type { DeviceProfile, ProgramLanguage } from '@/src/types/algorithm';
+import type {
+  DeviceProfile,
+  ProgramLanguage,
+  QuizQuestion,
+} from '@/src/types/algorithm';
 
 interface QuizTabProps {
   profile: DeviceProfile;
+  language: ProgramLanguage;
+  questions: QuizQuestion[];
   answeredMap: Record<string, number>;
-  onSubmitAnswer: (
-    questionId: string,
-    selectedOption: number,
-    isCorrect: boolean
-  ) => void;
+  onSubmitAnswer: (questionId: string, selectedOption: number) => void;
   onResetQuiz: () => void;
-  onTraceCodeInVisualizer: (language: ProgramLanguage, code: string) => void;
+  onJumpToStepInVisualizer: (stepIndex: number) => void;
 }
 
 export const QuizTab: React.FC<QuizTabProps> = ({
   profile,
+  language,
+  questions,
   answeredMap,
   onSubmitAnswer,
   onResetQuiz,
-  onTraceCodeInVisualizer,
+  onJumpToStepInVisualizer,
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const question = QUIZ_QUESTIONS[activeIndex];
+
+  if (questions.length === 0) {
+    return (
+      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-8 text-center space-y-2">
+        <h2 className="text-base font-semibold text-white">
+          Dry-Run Quiz Unavailable
+        </h2>
+        <p className="text-xs text-[#8E8E8E]">
+          Paste a runnable {language} program with variables or statements in
+          the Visualizer to generate dry-run questions automatically.
+        </p>
+      </div>
+    );
+  }
+
+  const safeIdx = Math.min(activeIndex, questions.length - 1);
+  const question = questions[safeIdx];
   const selectedChoice = answeredMap[question.id];
   const isAnswered = typeof selectedChoice === 'number';
   const isCorrect = isAnswered && selectedChoice === question.correctIndex;
 
-  const totalAnswered = Object.keys(answeredMap).length;
-  const totalCorrect = QUIZ_QUESTIONS.filter(
+  const totalAnswered = questions.filter(
+    (q) => typeof answeredMap[q.id] === 'number'
+  ).length;
+  const totalCorrect = questions.filter(
     (q) => answeredMap[q.id] === q.correctIndex
   ).length;
 
@@ -53,8 +74,8 @@ export const QuizTab: React.FC<QuizTabProps> = ({
             Dry-Run Output Lab
           </h2>
           <p className="text-xs text-[#8E8E8E] tabular-nums">
-            Solved {totalAnswered} of {QUIZ_QUESTIONS.length} · Score{' '}
-            {totalCorrect}/{QUIZ_QUESTIONS.length}
+            Generated from your {language} program · Solved {totalAnswered} of{' '}
+            {questions.length} · Score {totalCorrect}/{questions.length}
           </p>
         </div>
 
@@ -82,15 +103,15 @@ export const QuizTab: React.FC<QuizTabProps> = ({
         {/* Question Navigator */}
         <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] overflow-hidden">
           <div className="px-4 py-3 border-b border-[#2E2E2E] text-xs font-medium text-[#A3A3A3]">
-            Questions ({QUIZ_QUESTIONS.length})
+            Program Questions ({questions.length})
           </div>
 
           {isDesktop ? (
             <div className="divide-y divide-[#2E2E2E]">
-              {QUIZ_QUESTIONS.map((q, idx) => {
+              {questions.map((q, idx) => {
                 const answered = typeof answeredMap[q.id] === 'number';
                 const correct = answered && answeredMap[q.id] === q.correctIndex;
-                const active = idx === activeIndex;
+                const active = idx === safeIdx;
 
                 return (
                   <button
@@ -128,9 +149,9 @@ export const QuizTab: React.FC<QuizTabProps> = ({
             </div>
           ) : (
             <div className="p-3 flex items-center gap-2 overflow-x-auto">
-              {QUIZ_QUESTIONS.map((q, idx) => {
+              {questions.map((q, idx) => {
                 const answered = typeof answeredMap[q.id] === 'number';
-                const active = idx === activeIndex;
+                const active = idx === safeIdx;
                 return (
                   <button
                     key={q.id}
@@ -157,7 +178,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="space-y-0.5">
               <div className="text-xs text-[#8E8E8E]">
-                Question {activeIndex + 1} of {QUIZ_QUESTIONS.length} ·{' '}
+                Question {safeIdx + 1} of {questions.length} ·{' '}
                 {question.language}
               </div>
               <div className="text-xs font-medium text-[#A3A3A3]">
@@ -230,18 +251,12 @@ export const QuizTab: React.FC<QuizTabProps> = ({
                   key={idx}
                   type="button"
                   disabled={isAnswered}
-                  onClick={() =>
-                    onSubmitAnswer(
-                      question.id,
-                      idx,
-                      idx === question.correctIndex
-                    )
-                  }
+                  onClick={() => onSubmitAnswer(question.id, idx)}
                   className={`w-full px-4 py-3.5 min-h-[48px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-left transition-colors disabled:cursor-default ${rowBg}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {indicator}
-                    <span className="font-mono text-xs sm:text-sm text-white">
+                    <span className="font-mono text-xs sm:text-sm text-white break-all">
                       {opt}
                     </span>
                   </div>
@@ -261,7 +276,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({
             })}
           </div>
 
-          {/* Step-by-Step Dry-Run Explanation + Trace Link */}
+          {/* Step-by-Step Dry-Run Explanation */}
           {isAnswered && (
             <div className="rounded-xl bg-[#141414] border border-[#2E2E2E] p-4 space-y-3">
               <div className="space-y-1">
@@ -275,12 +290,12 @@ export const QuizTab: React.FC<QuizTabProps> = ({
               <button
                 type="button"
                 onClick={() =>
-                  onTraceCodeInVisualizer(question.language, question.code)
+                  onJumpToStepInVisualizer(question.targetStepIndex)
                 }
                 className="inline-flex items-center gap-1.5 rounded-full bg-[#2E2E2E] border border-[#454545] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#3A3A3A] whitespace-nowrap transition-colors"
               >
                 <Play className="w-3 h-3" />
-                <span>Trace in Visualizer</span>
+                <span>Inspect Step in Visualizer</span>
               </button>
             </div>
           )}
@@ -289,8 +304,8 @@ export const QuizTab: React.FC<QuizTabProps> = ({
           <div className="flex items-center justify-between pt-2 gap-2">
             <button
               type="button"
-              disabled={activeIndex === 0}
-              onClick={() => setActiveIndex((prev) => Math.max(0, prev - 1))}
+              disabled={safeIdx === 0}
+              onClick={() => setActiveIndex(Math.max(0, safeIdx - 1))}
               className="inline-flex items-center gap-1.5 rounded-full bg-[#2E2E2E] border border-[#454545] px-4 py-2 text-xs font-medium text-white hover:bg-[#3A3A3A] disabled:opacity-40 whitespace-nowrap shrink-0 transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -299,11 +314,9 @@ export const QuizTab: React.FC<QuizTabProps> = ({
 
             <button
               type="button"
-              disabled={activeIndex >= QUIZ_QUESTIONS.length - 1}
+              disabled={safeIdx >= questions.length - 1}
               onClick={() =>
-                setActiveIndex((prev) =>
-                  Math.min(QUIZ_QUESTIONS.length - 1, prev + 1)
-                )
+                setActiveIndex(Math.min(questions.length - 1, safeIdx + 1))
               }
               className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-medium text-[#141414] hover:bg-[#E5E5E5] disabled:opacity-40 whitespace-nowrap shrink-0 transition-colors"
             >

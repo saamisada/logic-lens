@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { AnalyticsTab } from '@/src/components/AnalyticsTab';
 import { BottomNav } from '@/src/components/BottomNav';
@@ -8,12 +8,13 @@ import { DesktopSideNav } from '@/src/components/DesktopSideNav';
 import { Header } from '@/src/components/Header';
 import { InstallGuideModal } from '@/src/components/InstallGuideModal';
 import { LibraryTab } from '@/src/components/LibraryTab';
+import {
+  getSampleCode,
+  ProgramEntryView,
+} from '@/src/components/ProgramEntryView';
 import { QuizTab } from '@/src/components/QuizTab';
 import { SettingsModal } from '@/src/components/SettingsModal';
-import {
-  getDefaultStarterCode,
-  VisualizerTab,
-} from '@/src/components/VisualizerTab';
+import { VisualizerTab } from '@/src/components/VisualizerTab';
 import { useDeviceLayout } from '@/src/hooks/useDeviceLayout';
 import { usePwaInstall } from '@/src/hooks/usePwaInstall';
 import type {
@@ -21,6 +22,8 @@ import type {
   StudentAnalytics,
   TabId,
 } from '@/src/types/algorithm';
+import { traceProgram } from '@/src/utils/codeInterpreter';
+import { analyzePlaygroundProgram } from '@/src/utils/programAnalyzer';
 import { registerServiceWorker } from '@/src/utils/registerSw';
 import {
   createDefaultAnalytics,
@@ -29,8 +32,7 @@ import {
   recordQuizSubmission,
   recordStepExecution,
   recordTraceExecution,
-  resetAllAnalytics,
-  resetAllQuizAnswers,
+  resetProgramQuizAnswers,
   saveUserGeminiKey,
   toggleConceptBookmark,
 } from '@/src/utils/storage';
@@ -39,11 +41,15 @@ export default function App() {
   const layout = useDeviceLayout();
   const pwa = usePwaInstall();
 
+  const [hasWorkspace, setHasWorkspace] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('visualize');
   const [language, setLanguage] = useState<ProgramLanguage>('Python');
-  const [code, setCode] = useState<string>(() =>
-    getDefaultStarterCode('Python')
+  const [code, setCode] = useState<string>(() => getSampleCode('Python'));
+  const [paramOverrides, setParamOverrides] = useState<Record<string, string>>(
+    {}
   );
+  const [stepIndex, setStepIndex] = useState(0);
+
   const [analytics, setAnalytics] = useState<StudentAnalytics>(
     createDefaultAnalytics
   );
@@ -74,8 +80,27 @@ export default function App() {
     };
   }, []);
 
-  const handleTraceExecuted = useCallback((lang: ProgramLanguage) => {
-    setAnalytics((prev) => recordTraceExecution(prev, lang));
+  const trace = useMemo(
+    () => traceProgram(language, code, paramOverrides),
+    [language, code, paramOverrides]
+  );
+
+  const analysis = useMemo(
+    () => analyzePlaygroundProgram(language, code, trace),
+    [language, code, trace]
+  );
+
+  const handleLaunchWorkspace = useCallback(() => {
+    setStepIndex(0);
+    setHasWorkspace(true);
+    setActiveTab('visualize');
+    setAnalytics((prev) =>
+      recordTraceExecution(resetProgramQuizAnswers(prev), language)
+    );
+  }, [language]);
+
+  const handleOpenProgramEntry = useCallback(() => {
+    setHasWorkspace(false);
   }, []);
 
   const handleStepExecuted = useCallback(() => {
@@ -83,34 +108,26 @@ export default function App() {
   }, []);
 
   const handleSubmitQuizAnswer = useCallback(
-    (questionId: string, selectedOption: number, isCorrect: boolean) => {
+    (questionId: string, selectedOption: number) => {
       setAnalytics((prev) =>
-        recordQuizSubmission(prev, questionId, selectedOption, isCorrect)
+        recordQuizSubmission(prev, questionId, selectedOption)
       );
     },
     []
   );
 
   const handleResetQuiz = useCallback(() => {
-    setAnalytics((prev) => resetAllQuizAnswers(prev));
+    setAnalytics((prev) => resetProgramQuizAnswers(prev));
   }, []);
 
   const handleToggleBookmark = useCallback((conceptId: string) => {
     setAnalytics((prev) => toggleConceptBookmark(prev, conceptId));
   }, []);
 
-  const handleResetAnalytics = useCallback(() => {
-    setAnalytics(resetAllAnalytics());
+  const handleJumpToStepInVisualizer = useCallback((targetIdx: number) => {
+    setStepIndex(Math.max(0, targetIdx));
+    setActiveTab('visualize');
   }, []);
-
-  const handleLoadCodeInVisualizer = useCallback(
-    (nextLang: ProgramLanguage, nextCode: string) => {
-      setLanguage(nextLang);
-      setCode(nextCode);
-      setActiveTab('visualize');
-    },
-    []
-  );
 
   const handleSaveGeminiKey = useCallback((key: string) => {
     saveUserGeminiKey(key);
@@ -121,17 +138,32 @@ export default function App() {
     void pwa.installApp();
   }, [pwa]);
 
-  const activeContent = (
+  const workspaceContent = !hasWorkspace ? (
+    <ProgramEntryView
+      profile={layout.effectiveProfile}
+      language={language}
+      code={code}
+      onChangeLanguage={(nextLang) => {
+        setLanguage(nextLang);
+        setParamOverrides({});
+      }}
+      onChangeCode={setCode}
+      onLaunchWorkspace={handleLaunchWorkspace}
+    />
+  ) : (
     <>
       {activeTab === 'visualize' && (
         <VisualizerTab
           profile={layout.effectiveProfile}
           language={language}
           code={code}
-          onChangeLanguage={setLanguage}
-          onChangeCode={setCode}
-          onTraceExecuted={handleTraceExecuted}
+          trace={trace}
+          stepIndex={stepIndex}
+          onChangeStepIndex={setStepIndex}
+          paramOverrides={paramOverrides}
+          onChangeParamOverrides={setParamOverrides}
           onStepExecuted={handleStepExecuted}
+          onEditPlaygroundProgram={handleOpenProgramEntry}
           geminiKey={geminiKey}
         />
       )}
@@ -139,27 +171,35 @@ export default function App() {
       {activeTab === 'library' && (
         <LibraryTab
           profile={layout.effectiveProfile}
+          language={language}
+          concepts={analysis.concepts}
           bookmarkedIds={analytics.bookmarkedConceptIds}
           onToggleBookmark={handleToggleBookmark}
-          onLoadSnippetInVisualizer={handleLoadCodeInVisualizer}
+          onJumpToStepInVisualizer={handleJumpToStepInVisualizer}
         />
       )}
 
       {activeTab === 'quiz' && (
         <QuizTab
           profile={layout.effectiveProfile}
+          language={language}
+          questions={analysis.quizzes}
           answeredMap={analytics.answeredQuizMap}
           onSubmitAnswer={handleSubmitQuizAnswer}
           onResetQuiz={handleResetQuiz}
-          onTraceCodeInVisualizer={handleLoadCodeInVisualizer}
+          onJumpToStepInVisualizer={handleJumpToStepInVisualizer}
         />
       )}
 
       {activeTab === 'analytics' && (
         <AnalyticsTab
           profile={layout.effectiveProfile}
-          analytics={analytics}
-          onResetAnalytics={handleResetAnalytics}
+          language={language}
+          trace={trace}
+          analysis={analysis}
+          questions={analysis.quizzes}
+          answeredMap={analytics.answeredQuizMap}
+          onEditPlaygroundProgram={handleOpenProgramEntry}
         />
       )}
     </>
@@ -177,8 +217,10 @@ export default function App() {
       {layout.effectiveProfile === 'desktop' ? (
         <div className="w-full h-screen flex overflow-hidden bg-[#141414]">
           <DesktopSideNav
+            hasWorkspace={hasWorkspace}
             activeTab={activeTab}
             onSelectTab={setActiveTab}
+            onOpenProgramEntry={handleOpenProgramEntry}
             ratioLabel={layout.ratioLabel}
             dimensionsLabel={`${layout.width}x${layout.height}`}
             isInstalled={pwa.isInstalled}
@@ -187,7 +229,7 @@ export default function App() {
           />
 
           <main className="flex-1 h-full overflow-y-auto bg-[#0E0E0E]">
-            <div className="max-w-7xl mx-auto p-6">{activeContent}</div>
+            <div className="max-w-7xl mx-auto p-6">{workspaceContent}</div>
           </main>
         </div>
       ) : (
@@ -205,11 +247,13 @@ export default function App() {
             onOpenSettings={() => setSettingsOpen(true)}
           />
 
-          <main className="flex-1 p-4 pb-24 bg-[#0E0E0E]">
-            {activeContent}
+          <main className={`flex-1 p-4 bg-[#0E0E0E] ${hasWorkspace ? 'pb-24' : 'pb-6'}`}>
+            {workspaceContent}
           </main>
 
-          <BottomNav activeTab={activeTab} onSelectTab={setActiveTab} />
+          {hasWorkspace && (
+            <BottomNav activeTab={activeTab} onSelectTab={setActiveTab} />
+          )}
         </div>
       )}
 

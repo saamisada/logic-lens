@@ -1,47 +1,51 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
-import { CONCEPTS } from '@/src/data/concepts';
-import { QUIZ_QUESTIONS } from '@/src/data/quizzes';
-import type { DeviceProfile, StudentAnalytics } from '@/src/types/algorithm';
-import { getLastSevenDaysActivity } from '@/src/utils/storage';
+import React from 'react';
+import { Edit3 } from 'lucide-react';
+import type {
+  DeviceProfile,
+  ProgramAnalysis,
+  ProgramLanguage,
+  QuizQuestion,
+  TraceResult,
+} from '@/src/types/algorithm';
 
 interface AnalyticsTabProps {
   profile: DeviceProfile;
-  analytics: StudentAnalytics;
-  onResetAnalytics: () => void;
+  language: ProgramLanguage;
+  trace: TraceResult;
+  analysis: ProgramAnalysis;
+  questions: QuizQuestion[];
+  answeredMap: Record<string, number>;
+  onEditPlaygroundProgram: () => void;
 }
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   profile,
-  analytics,
-  onResetAnalytics,
+  language,
+  trace,
+  analysis,
+  questions,
+  answeredMap,
+  onEditPlaygroundProgram,
 }) => {
-  const [confirmReset, setConfirmReset] = useState(false);
+  const solvedCount = questions.filter(
+    (q) => typeof answeredMap[q.id] === 'number'
+  ).length;
+  const correctCount = questions.filter(
+    (q) => answeredMap[q.id] === q.correctIndex
+  ).length;
+  const quizAccuracyPct =
+    solvedCount > 0 ? Math.round((correctCount / solvedCount) * 100) : 0;
 
-  const accuracyPct =
-    analytics.quizzesAttempted > 0
-      ? Math.round(
-          (analytics.quizzesCorrect / analytics.quizzesAttempted) * 100
-        )
-      : 0;
-
-  const traceFactor = Math.min(1, analytics.tracesRun / 6);
-  const quizCoverage = Math.min(
+  const maxLineHits = Math.max(
     1,
-    analytics.completedQuizIds.length / QUIZ_QUESTIONS.length
+    ...analysis.lineStats.map((stat) => stat.hits)
   );
-  const stepFactor = Math.min(1, analytics.stepsExecuted / 60);
-  const readinessPct = Math.round(
-    (traceFactor * 0.35 + quizCoverage * 0.4 + stepFactor * 0.25) * 100
+  const maxMutations = Math.max(
+    1,
+    ...analysis.variableStats.map((v) => v.mutations)
   );
-
-  const sevenDayData = useMemo(
-    () => getLastSevenDaysActivity(analytics),
-    [analytics]
-  );
-  const maxDaily = Math.max(1, ...sevenDayData.map((d) => d.steps));
 
   const kpiGridClass =
     profile === 'mobile' ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-4 gap-3';
@@ -51,211 +55,178 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       ? 'grid grid-cols-2 gap-4 items-start'
       : 'space-y-4';
 
-  const totalLanguageTraces = Math.max(
-    1,
-    analytics.pythonTraces + analytics.cTraces
-  );
-  const pythonPct = Math.round(
-    (analytics.pythonTraces / totalLanguageTraces) * 100
-  );
-  const cPct = Math.round((analytics.cTraces / totalLanguageTraces) * 100);
-
   return (
     <div className="space-y-4">
+      {/* Header Banner */}
+      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-0.5">
+          <h2 className="text-base font-semibold text-white">
+            Program Execution Analytics
+          </h2>
+          <p className="text-xs text-[#8E8E8E]">
+            Telemetry computed exclusively for your active {language} program (
+            {analysis.nonEmptyLines} active lines)
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onEditPlaygroundProgram}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white text-[#141414] hover:bg-[#E5E5E5] px-4 py-2 text-xs font-medium whitespace-nowrap shrink-0 self-start sm:self-auto transition-colors"
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+          <span>Change Program</span>
+        </button>
+      </div>
+
       {/* KPI Metrics Row */}
       <div className={kpiGridClass}>
         <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-1">
-          <div className="text-xs text-[#8E8E8E]">Practice Score</div>
+          <div className="text-xs text-[#8E8E8E]">Total Steps</div>
           <div className="text-2xl font-semibold text-white tabular-nums">
-            {readinessPct}%
-          </div>
-          <div className="text-[11px] text-[#A3A3A3] tabular-nums">
-            {analytics.tracesRun} traces run
-          </div>
-        </div>
-
-        <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-1">
-          <div className="text-xs text-[#8E8E8E]">Active Streak</div>
-          <div className="text-2xl font-semibold text-white tabular-nums">
-            {analytics.streakDays}d
-          </div>
-          <div className="text-[11px] text-[#A3A3A3]">Consecutive study</div>
-        </div>
-
-        <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-1">
-          <div className="text-xs text-[#8E8E8E]">Steps Executed</div>
-          <div className="text-2xl font-semibold text-white tabular-nums">
-            {analytics.stepsExecuted}
+            {trace.metrics.totalSteps}
           </div>
           <div className="text-[11px] text-[#A3A3A3]">
-            Dry-run transitions
+            Est. {trace.metrics.estimatedComplexity}
           </div>
         </div>
 
         <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-1">
-          <div className="text-xs text-[#8E8E8E]">Quiz Accuracy</div>
+          <div className="text-xs text-[#8E8E8E]">Loop Depth</div>
           <div className="text-2xl font-semibold text-white tabular-nums">
-            {accuracyPct}%
+            {trace.metrics.maxLoopDepth}
+          </div>
+          <div className="text-[11px] text-[#A3A3A3]">
+            Hottest: Line {analysis.hottestLine}
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-1">
+          <div className="text-xs text-[#8E8E8E]">Operations</div>
+          <div className="text-2xl font-semibold text-white tabular-nums">
+            {trace.metrics.comparisons + trace.metrics.writes}
           </div>
           <div className="text-[11px] text-[#A3A3A3] tabular-nums">
-            {analytics.quizzesCorrect}/{analytics.quizzesAttempted} solved
+            {trace.metrics.comparisons} cmp · {trace.metrics.writes} writes
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-1">
+          <div className="text-xs text-[#8E8E8E]">Program Quiz</div>
+          <div className="text-2xl font-semibold text-white tabular-nums">
+            {quizAccuracyPct}%
+          </div>
+          <div className="text-[11px] text-[#A3A3A3] tabular-nums">
+            {correctCount}/{questions.length} correct
           </div>
         </div>
       </div>
 
-      {/* 7-Day Activity Chart + Language Breakdown */}
+      {/* Per-Line Execution Heatmap + Variable Mutation Breakdown */}
       <div className={splitClass}>
-        {/* 7-Day Monochrome Bar Chart */}
-        <section className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-            <div className="space-y-0.5">
-              <h3 className="text-sm font-medium text-white">
-                7-Day Study Activity
-              </h3>
-              <p className="text-xs text-[#8E8E8E]">
-                Trace steps and quiz submissions logged locally
-              </p>
-            </div>
-            <span className="text-xs font-mono text-[#A3A3A3] tabular-nums whitespace-nowrap">
-              Peak: {maxDaily}
-            </span>
-          </div>
-
-          <div className="h-44 rounded-xl bg-[#141414] border border-[#2E2E2E] px-4 pt-6 pb-3 flex items-end justify-between gap-2">
-            {sevenDayData.map((entry) => {
-              const heightPct = Math.max(
-                8,
-                Math.round((entry.steps / maxDaily) * 100)
-              );
-              const hasActivity = entry.steps > 0;
-              return (
-                <div
-                  key={entry.date}
-                  className="flex-1 h-full flex flex-col items-center justify-end gap-2"
-                >
-                  <span className="font-mono text-[10px] text-[#A3A3A3] tabular-nums">
-                    {entry.steps}
-                  </span>
-                  <div className="w-full max-w-[32px] flex-1 flex items-end justify-center">
-                    <div
-                      style={{ height: `${heightPct}%` }}
-                      className={`w-full rounded-t-md transition-all ${
-                        hasActivity
-                          ? 'bg-white'
-                          : 'bg-[#2A2A2A] border border-[#2E2E2E]'
-                      }`}
-                    />
-                  </div>
-                  <span className="text-[11px] text-[#8E8E8E]">
-                    {entry.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Language & Practice Breakdown */}
+        {/* Line-by-Line Execution Frequency */}
         <section className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-4">
           <div className="space-y-0.5">
             <h3 className="text-sm font-medium text-white">
-              Language & Practice Breakdown
+              Line Execution Frequency
             </h3>
             <p className="text-xs text-[#8E8E8E]">
-              Python and C programs traced locally
+              How many times each line of your {language} program ran
             </p>
           </div>
 
-          <div className="space-y-3.5">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-white font-medium">Python Traces</span>
-                <span className="font-mono text-[#A3A3A3] tabular-nums whitespace-nowrap">
-                  {analytics.pythonTraces} ({pythonPct}%)
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-[#141414] border border-[#2E2E2E] overflow-hidden">
-                <div
-                  style={{ width: `${analytics.pythonTraces > 0 ? pythonPct : 0}%` }}
-                  className="h-full rounded-full bg-white transition-all"
-                />
-              </div>
+          {analysis.lineStats.length === 0 ? (
+            <div className="text-xs text-[#8E8E8E]">No lines traced.</div>
+          ) : (
+            <div className="space-y-2.5">
+              {analysis.lineStats.map((stat) => {
+                const widthPct =
+                  stat.hits > 0
+                    ? Math.max(8, Math.round((stat.hits / maxLineHits) * 100))
+                    : 0;
+                return (
+                  <div key={stat.lineNumber} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-mono text-[#A3A3A3] truncate">
+                        <span className="text-[#8E8E8E] mr-2 tabular-nums">
+                          L{stat.lineNumber}
+                        </span>
+                        <span className="text-white">{stat.code.trim()}</span>
+                      </span>
+                      <span className="font-mono text-white tabular-nums whitespace-nowrap shrink-0">
+                        {stat.hits}x
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-[#141414] border border-[#2E2E2E] overflow-hidden">
+                      <div
+                        style={{ width: `${widthPct}%` }}
+                        className="h-full rounded-full bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-white font-medium">C Traces</span>
-                <span className="font-mono text-[#A3A3A3] tabular-nums whitespace-nowrap">
-                  {analytics.cTraces} ({cPct}%)
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-[#141414] border border-[#2E2E2E] overflow-hidden">
-                <div
-                  style={{ width: `${analytics.cTraces > 0 ? cPct : 0}%` }}
-                  className="h-full rounded-full bg-white transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-[#2E2E2E] space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#A3A3A3]">Quiz Questions Solved</span>
-                <span className="font-mono text-white tabular-nums whitespace-nowrap">
-                  {analytics.completedQuizIds.length} / {QUIZ_QUESTIONS.length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#A3A3A3]">Bookmarked Concepts</span>
-                <span className="font-mono text-white tabular-nums whitespace-nowrap">
-                  {analytics.bookmarkedConceptIds.length} / {CONCEPTS.length}
-                </span>
-              </div>
-            </div>
-          </div>
+          )}
         </section>
-      </div>
 
-      {/* Local Data Reset Footer */}
-      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="space-y-0.5">
-          <div className="text-sm font-medium text-white">
-            Local Progress Storage
+        {/* Variable Mutation Breakdown */}
+        <section className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-4">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-medium text-white">
+              Variable Mutation Profile
+            </h3>
+            <p className="text-xs text-[#8E8E8E]">
+              Update frequency and final state per variable
+            </p>
           </div>
-          <div className="text-xs text-[#8E8E8E]">
-            All analytics stay strictly on your device in browser localStorage.
-          </div>
-        </div>
 
-        {!confirmReset ? (
-          <button
-            type="button"
-            onClick={() => setConfirmReset(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#2E2E2E] border border-[#454545] px-4 py-2 text-xs font-medium text-white hover:bg-[#3A3A3A] whitespace-nowrap shrink-0 self-start sm:self-auto transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Progress</span>
-          </button>
-        ) : (
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setConfirmReset(false)}
-              className="rounded-full bg-[#2E2E2E] border border-[#454545] px-3.5 py-2 text-xs font-medium text-white whitespace-nowrap"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onResetAnalytics();
-                setConfirmReset(false);
-              }}
-              className="rounded-full bg-white px-4 py-2 text-xs font-medium text-[#141414] whitespace-nowrap"
-            >
-              Confirm Reset
-            </button>
-          </div>
-        )}
+          {analysis.variableStats.length === 0 ? (
+            <div className="text-xs text-[#8E8E8E]">
+              No variables declared in this program.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {analysis.variableStats.map((v) => {
+                const widthPct =
+                  v.mutations > 0
+                    ? Math.max(
+                        10,
+                        Math.round((v.mutations / maxMutations) * 100)
+                      )
+                    : 0;
+                return (
+                  <div key={v.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-white font-medium whitespace-nowrap">
+                          {v.name}
+                        </span>
+                        <span className="font-mono text-[11px] text-[#8E8E8E] whitespace-nowrap">
+                          {v.type}
+                        </span>
+                      </div>
+                      <span className="font-mono text-[#A3A3A3] tabular-nums whitespace-nowrap shrink-0">
+                        {v.mutations} updates
+                      </span>
+                    </div>
+
+                    <div className="h-1.5 w-full rounded-full bg-[#141414] border border-[#2E2E2E] overflow-hidden">
+                      <div
+                        style={{ width: `${widthPct}%` }}
+                        className="h-full rounded-full bg-white transition-all"
+                      />
+                    </div>
+
+                    <div className="text-[11px] font-mono text-[#8E8E8E] truncate">
+                      Final: {v.finalValue}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

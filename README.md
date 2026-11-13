@@ -54,16 +54,15 @@ LogicLens computes `window.innerWidth / window.innerHeight` on load and on every
     ├── types/algorithm.ts          # TypeScript interfaces
     ├── utils/
     │   ├── codeInterpreter.ts      # Client-side Python & C step-by-step interpreter
+    │   ├── programAnalyzer.ts      # Dynamic concept library, quiz & analytics generator
     │   ├── deviceRatio.ts          # Aspect-ratio classifier
     │   ├── storage.ts              # Safe localStorage wrapper
     │   └── registerSw.ts           # Service worker registration
     ├── hooks/
     │   ├── useDeviceLayout.ts      # Reactive viewport aspect-ratio hook
     │   └── usePwaInstall.ts        # PWA install prompt hook
-    ├── data/
-    │   ├── concepts.ts             # Micro-learning concept cards
-    │   └── quizzes.ts              # Dry-run output prediction questions
     └── components/
+        ├── ProgramEntryView.tsx    # Launch screen for choosing Python/C & pasting code
         ├── Header.tsx
         ├── BottomNav.tsx
         ├── DesktopSideNav.tsx

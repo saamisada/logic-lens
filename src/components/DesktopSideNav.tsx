@@ -6,6 +6,7 @@ import {
   BookOpen,
   Check,
   CheckSquare,
+  Code2,
   Download,
   PlaySquare,
   Settings,
@@ -13,8 +14,10 @@ import {
 import type { TabId } from '@/src/types/algorithm';
 
 interface DesktopSideNavProps {
+  hasWorkspace: boolean;
   activeTab: TabId;
   onSelectTab: (tab: TabId) => void;
+  onOpenProgramEntry: () => void;
   ratioLabel: string;
   dimensionsLabel: string;
   isInstalled: boolean;
@@ -37,26 +40,28 @@ const NAV_ITEMS: Array<{
   {
     id: 'library',
     label: 'Library',
-    subtitle: 'Concepts & patterns',
+    subtitle: 'Program concepts',
     icon: BookOpen,
   },
   {
     id: 'quiz',
     label: 'Quiz',
-    subtitle: 'Dry-run output lab',
+    subtitle: 'Program output lab',
     icon: CheckSquare,
   },
   {
     id: 'analytics',
     label: 'Analytics',
-    subtitle: 'Readiness & activity',
+    subtitle: 'Program telemetry',
     icon: BarChart3,
   },
 ];
 
 export const DesktopSideNav: React.FC<DesktopSideNavProps> = ({
+  hasWorkspace,
   activeTab,
   onSelectTab,
+  onOpenProgramEntry,
   ratioLabel,
   dimensionsLabel,
   isInstalled,
@@ -65,7 +70,7 @@ export const DesktopSideNav: React.FC<DesktopSideNavProps> = ({
 }) => {
   return (
     <aside className="w-64 shrink-0 h-full bg-[#141414] border-r border-[#2E2E2E] flex flex-col justify-between p-4 select-none">
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Brand Block */}
         <div className="px-2 pt-1 flex items-center gap-3">
           <div
@@ -118,40 +123,67 @@ export const DesktopSideNav: React.FC<DesktopSideNavProps> = ({
           </div>
         </div>
 
+        {/* Playground Program Trigger */}
+        <button
+          type="button"
+          onClick={onOpenProgramEntry}
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-colors ${
+            !hasWorkspace
+              ? 'bg-white text-[#141414]'
+              : 'bg-[#1F1F1F] text-white border border-[#2E2E2E] hover:bg-[#2A2A2A]'
+          }`}
+        >
+          <Code2 className="w-4 h-4 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-sm font-medium leading-tight whitespace-nowrap">
+              {hasWorkspace ? 'Change Program' : 'Paste Program'}
+            </div>
+            <div
+              className={`text-[11px] leading-tight mt-0.5 whitespace-nowrap ${
+                !hasWorkspace ? 'text-[#454545]' : 'text-[#8E8E8E]'
+              }`}
+            >
+              Python or C input
+            </div>
+          </div>
+        </button>
+
         {/* Vertical Android-Settings Navigation Rows */}
-        <nav aria-label="Desktop workspace navigation" className="space-y-1.5">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelectTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-colors ${
-                  isActive
-                    ? 'bg-[#2A2A2A] text-white border border-[#454545]'
-                    : 'text-[#A3A3A3] hover:bg-[#1F1F1F] hover:text-white border border-transparent'
-                }`}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isActive ? 'text-white' : 'text-[#8E8E8E]'
+        {hasWorkspace && (
+          <nav aria-label="Desktop workspace navigation" className="space-y-1.5">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelectTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-colors ${
+                    isActive
+                      ? 'bg-[#2A2A2A] text-white border border-[#454545]'
+                      : 'text-[#A3A3A3] hover:bg-[#1F1F1F] hover:text-white border border-transparent'
                   }`}
-                />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium leading-tight">
-                    {item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <Icon
+                    className={`w-4 h-4 shrink-0 ${
+                      isActive ? 'text-white' : 'text-[#8E8E8E]'
+                    }`}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium leading-tight whitespace-nowrap">
+                      {item.label}
+                    </div>
+                    <div className="text-[11px] text-[#8E8E8E] leading-tight mt-0.5 whitespace-nowrap">
+                      {item.subtitle}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[#8E8E8E] leading-tight mt-0.5 truncate">
-                    {item.subtitle}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </nav>
+                </button>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
       {/* Bottom Action Group */}
@@ -185,10 +217,10 @@ export const DesktopSideNav: React.FC<DesktopSideNavProps> = ({
         >
           <Settings className="w-4 h-4 shrink-0" />
           <div className="min-w-0">
-            <div className="text-sm font-medium text-white leading-tight">
+            <div className="text-sm font-medium text-white leading-tight whitespace-nowrap">
               Settings
             </div>
-            <div className="text-[11px] text-[#8E8E8E] leading-tight mt-0.5">
+            <div className="text-[11px] text-[#8E8E8E] leading-tight mt-0.5 whitespace-nowrap">
               Layout & BYOK Key
             </div>
           </div>

@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Code2,
+  Edit3,
   Pause,
   Play,
   RotateCcw,
   Sparkles,
   Terminal,
-  Trash2,
 } from 'lucide-react';
 import { ArrayVisualStage } from '@/src/components/ArrayVisualStage';
 import type {
@@ -19,73 +18,39 @@ import type {
   ProgramLanguage,
   TraceResult,
 } from '@/src/types/algorithm';
-import { traceProgram } from '@/src/utils/codeInterpreter';
 
 interface VisualizerTabProps {
   profile: DeviceProfile;
   language: ProgramLanguage;
   code: string;
-  onChangeLanguage: (lang: ProgramLanguage) => void;
-  onChangeCode: (nextCode: string) => void;
-  onTraceExecuted: (lang: ProgramLanguage) => void;
+  trace: TraceResult;
+  stepIndex: number;
+  onChangeStepIndex: (next: number) => void;
+  paramOverrides: Record<string, string>;
+  onChangeParamOverrides: (next: Record<string, string>) => void;
   onStepExecuted: () => void;
+  onEditPlaygroundProgram: () => void;
   geminiKey: string;
-}
-
-const DEFAULT_PYTHON_STARTER = `arr = [29, 10, 14, 37, 13]
-n = len(arr)
-for i in range(n - 1):
-  for j in range(n - i - 1):
-    if arr[j] > arr[j + 1]:
-      arr[j], arr[j + 1] = arr[j + 1], arr[j]
-print("Sorted:", arr)`;
-
-const DEFAULT_C_STARTER = `int main() {
-  int arr[] = {29, 10, 14, 37, 13};
-  int n = 5;
-  for (int i = 0; i < n - 1; i++) {
-    for (int j = 0; j < n - i - 1; j++) {
-      if (arr[j] > arr[j + 1]) {
-        int temp = arr[j];
-        arr[j] = arr[j + 1];
-        arr[j + 1] = temp;
-      }
-    }
-  }
-  printf("Done: %d %d", arr[0], arr[4]);
-  return 0;
-}`;
-
-export function getDefaultStarterCode(lang: ProgramLanguage): string {
-  return lang === 'Python' ? DEFAULT_PYTHON_STARTER : DEFAULT_C_STARTER;
 }
 
 export const VisualizerTab: React.FC<VisualizerTabProps> = ({
   profile,
   language,
-  code,
-  onChangeLanguage,
-  onChangeCode,
-  onTraceExecuted,
+  trace,
+  stepIndex,
+  onChangeStepIndex,
+  paramOverrides,
+  onChangeParamOverrides,
   onStepExecuted,
+  onEditPlaygroundProgram,
   geminiKey,
 }) => {
-  const [paramOverrides, setParamOverrides] = useState<Record<string, string>>(
-    {}
-  );
-  const [stepIndex, setStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState<1 | 2>(1);
   const [showDeepInsight, setShowDeepInsight] = useState(false);
   const [byokExplanation, setByokExplanation] = useState<string | null>(null);
   const [byokLoading, setByokLoading] = useState(false);
   const [byokError, setByokError] = useState<string | null>(null);
-  const [editorExpanded, setEditorExpanded] = useState(true);
-
-  const trace: TraceResult = useMemo(
-    () => traceProgram(language, code, paramOverrides),
-    [language, code, paramOverrides]
-  );
 
   const steps = trace.steps;
   const safeStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
@@ -98,7 +63,7 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
     const intervalMs = speedMultiplier === 2 ? 500 : 980;
     const timer = window.setTimeout(() => {
       const nextIndex = Math.min(steps.length - 1, safeStepIndex + 1);
-      setStepIndex(nextIndex);
+      onChangeStepIndex(nextIndex);
       if (nextIndex >= steps.length - 1) {
         setIsPlaying(false);
       }
@@ -112,48 +77,26 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
     safeStepIndex,
     steps.length,
     speedMultiplier,
+    onChangeStepIndex,
     onStepExecuted,
   ]);
-
-  const handleLanguageSwitch = (nextLang: ProgramLanguage) => {
-    if (nextLang === language) return;
-    setIsPlaying(false);
-    setStepIndex(0);
-    setParamOverrides({});
-    setByokExplanation(null);
-    setByokError(null);
-    onChangeLanguage(nextLang);
-    onChangeCode(getDefaultStarterCode(nextLang));
-  };
-
-  const handleRunTrace = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setIsPlaying(false);
-    setStepIndex(0);
-    setByokExplanation(null);
-    setByokError(null);
-    onTraceExecuted(language);
-    if (profile === 'mobile') {
-      setEditorExpanded(false);
-    }
-  };
 
   const handleNext = () => {
     setIsPlaying(false);
     if (safeStepIndex < steps.length - 1) {
-      setStepIndex(safeStepIndex + 1);
+      onChangeStepIndex(safeStepIndex + 1);
       onStepExecuted();
     }
   };
 
   const handlePrev = () => {
     setIsPlaying(false);
-    setStepIndex(Math.max(0, safeStepIndex - 1));
+    onChangeStepIndex(Math.max(0, safeStepIndex - 1));
   };
 
   const handleReset = () => {
     setIsPlaying(false);
-    setStepIndex(0);
+    onChangeStepIndex(0);
     setByokExplanation(null);
     setByokError(null);
   };
@@ -163,8 +106,7 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
     setByokLoading(true);
     setByokError(null);
     try {
-      const activeLine =
-        trace.codeLines[currentStep.lineNumber - 1] ?? '';
+      const activeLine = trace.codeLines[currentStep.lineNumber - 1] ?? '';
       const prompt = `Explain this single ${language} execution step clearly in 2-3 concise sentences (no emojis, plain text only). Line ${currentStep.lineNumber}: ${activeLine}. Step note: ${currentStep.note}. Variables: ${currentStep.variables.map((v) => `${v.name}=${v.value}`).join(', ')}.`;
 
       const res = await fetch(
@@ -200,156 +142,67 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Top Program Input & Language Bar */}
-      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] overflow-hidden">
-        <div className="px-4 py-3.5 border-b border-[#2E2E2E] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="space-y-0.5">
-            <h2 className="text-sm font-semibold text-white whitespace-nowrap">
-              Program Input
-            </h2>
-            <p className="text-xs text-[#8E8E8E]">
-              Choose Python or C and paste any program to trace automatically
-            </p>
+      {/* Active Playground Program Summary Bar */}
+      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="text-sm font-semibold text-white">
+            Active {language} Playground Program
           </div>
-
-          {/* Strictly Two Languages: Python or C */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div
-              role="group"
-              aria-label="Program language selector"
-              className="inline-flex items-center rounded-full bg-[#141414] border border-[#2E2E2E] p-1 gap-1"
-            >
-              {(['Python', 'C'] as const).map((lang) => {
-                const active = language === lang;
-                return (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => handleLanguageSwitch(lang)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                      active
-                        ? 'bg-white text-[#141414]'
-                        : 'text-[#A3A3A3] hover:text-white'
-                    }`}
-                  >
-                    {lang}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setEditorExpanded((prev) => !prev)}
-              className="rounded-full bg-[#2E2E2E] border border-[#454545] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#3A3A3A] whitespace-nowrap shrink-0 transition-colors"
-            >
-              {editorExpanded ? 'Hide Editor' : 'Edit Code'}
-            </button>
+          <div className="text-xs text-[#8E8E8E]">
+            Entry: {trace.metrics.detectedEntry} · {trace.steps.length} traced
+            steps
           </div>
         </div>
 
-        {editorExpanded && (
-          <form onSubmit={handleRunTrace} className="p-4 space-y-3 bg-[#141414]">
-            <textarea
-              value={code}
-              onChange={(e) => {
-                setIsPlaying(false);
-                setStepIndex(0);
-                onChangeCode(e.target.value);
-              }}
-              spellCheck={false}
-              rows={7}
-              aria-label={`${language} source code editor`}
-              placeholder={
-                language === 'Python'
-                  ? 'Paste your Python program here...'
-                  : 'Paste your C program here...'
-              }
-              className="w-full rounded-xl bg-[#0E0E0E] border border-[#2E2E2E] p-3.5 font-mono text-xs text-white leading-6 placeholder-[#8E8E8E] focus:outline-none focus:border-white resize-y whitespace-pre overflow-x-auto"
-            />
-
-            {/* Auto-detected function parameter inputs if user pasted a function without main/call */}
-            {trace.detectedParams.length > 0 && (
-              <div className="rounded-xl bg-[#1F1F1F] border border-[#2E2E2E] p-3 space-y-2.5">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-medium text-white">
-                    Detected Function Arguments
-                  </div>
-                  <div className="text-[11px] text-[#8E8E8E]">
-                    Entry: {trace.metrics.detectedEntry}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  {trace.detectedParams.map((param) => (
-                    <div key={param.name} className="space-y-1">
-                      <label
-                        htmlFor={`param-${param.name}`}
-                        className="block font-mono text-[11px] text-[#A3A3A3] whitespace-nowrap"
-                      >
-                        {param.name} ({param.kind})
-                      </label>
-                      <input
-                        id={`param-${param.name}`}
-                        type="text"
-                        value={
-                          paramOverrides[param.name] ?? param.defaultValue
-                        }
-                        onChange={(e) => {
-                          setStepIndex(0);
-                          setIsPlaying(false);
-                          setParamOverrides((prev) => ({
-                            ...prev,
-                            [param.name]: e.target.value,
-                          }));
-                        }}
-                        className="w-full rounded-lg bg-[#141414] border border-[#2E2E2E] px-2.5 py-2 font-mono text-xs text-white focus:outline-none focus:border-white"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPlaying(false);
-                    setStepIndex(0);
-                    onChangeCode('');
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#2E2E2E] border border-[#454545] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#3A3A3A] whitespace-nowrap shrink-0 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Clear</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPlaying(false);
-                    setStepIndex(0);
-                    setParamOverrides({});
-                    onChangeCode(getDefaultStarterCode(language));
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#2E2E2E] border border-[#454545] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#3A3A3A] whitespace-nowrap shrink-0 transition-colors"
-                >
-                  <Code2 className="w-3.5 h-3.5" />
-                  <span>Reset Sample</span>
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white text-[#141414] hover:bg-[#E5E5E5] px-5 py-2 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Trace Program</span>
-              </button>
-            </div>
-          </form>
-        )}
+        <button
+          type="button"
+          onClick={onEditPlaygroundProgram}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white text-[#141414] hover:bg-[#E5E5E5] px-4 py-2 text-xs font-medium whitespace-nowrap shrink-0 self-start sm:self-auto transition-colors"
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+          <span>Edit or Paste New Program</span>
+        </button>
       </div>
+
+      {/* Editable Function Arguments if user pasted a function without caller */}
+      {trace.detectedParams.length > 0 && (
+        <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-3">
+          <div className="space-y-0.5">
+            <div className="text-xs font-medium text-white">
+              Function Input Arguments
+            </div>
+            <div className="text-[11px] text-[#8E8E8E]">
+              Modify parameters below to re-trace {trace.metrics.detectedEntry}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {trace.detectedParams.map((param) => (
+              <div key={param.name} className="space-y-1">
+                <label
+                  htmlFor={`vis-param-${param.name}`}
+                  className="block font-mono text-[11px] text-[#A3A3A3] whitespace-nowrap"
+                >
+                  {param.name} ({param.kind})
+                </label>
+                <input
+                  id={`vis-param-${param.name}`}
+                  type="text"
+                  value={paramOverrides[param.name] ?? param.defaultValue}
+                  onChange={(e) => {
+                    setIsPlaying(false);
+                    onChangeStepIndex(0);
+                    onChangeParamOverrides({
+                      ...paramOverrides,
+                      [param.name]: e.target.value,
+                    });
+                  }}
+                  className="w-full rounded-xl bg-[#141414] border border-[#2E2E2E] px-3 py-2 font-mono text-xs text-white focus:outline-none focus:border-white"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Parse / Runtime Error Banner */}
       {!trace.ok && (
@@ -376,24 +229,25 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
         >
           {/* LEFT COLUMN: Code Stage + Step Note + Playback Deck */}
           <div className="space-y-4 min-w-0">
-            {/* Code Stage */}
+            {/* Code Stage (valid HTML5 div-based line rows) */}
             <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#2E2E2E] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                 <div className="space-y-0.5">
                   <div className="text-sm font-medium text-white whitespace-nowrap">
-                    {language} Execution Trace
+                    {language} Execution Stage
                   </div>
                   <div className="text-xs text-[#8E8E8E]">
-                    Entry: {trace.metrics.detectedEntry}
+                    Line-by-line pointer execution
                   </div>
                 </div>
                 <span className="text-xs font-mono text-[#A3A3A3] tabular-nums whitespace-nowrap">
-                  Line {currentStep?.lineNumber ?? 1} of {trace.codeLines.length}
+                  Line {currentStep?.lineNumber ?? 1} of{' '}
+                  {trace.codeLines.length}
                 </span>
               </div>
 
               <div className="p-3 bg-[#141414] overflow-x-auto">
-                <pre className="font-mono text-xs leading-6 min-w-max">
+                <div className="font-mono text-xs leading-6 min-w-max">
                   {trace.codeLines.map((line, idx) => {
                     const lineNo = idx + 1;
                     const isActive = currentStep?.lineNumber === lineNo;
@@ -413,7 +267,7 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
                       </div>
                     );
                   })}
-                </pre>
+                </div>
               </div>
             </div>
 
@@ -469,7 +323,7 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
                 value={safeStepIndex}
                 onChange={(e) => {
                   setIsPlaying(false);
-                  setStepIndex(Number(e.target.value));
+                  onChangeStepIndex(Number(e.target.value));
                 }}
                 aria-label="Execution step scrubber"
                 className="w-full accent-white cursor-pointer"
@@ -501,7 +355,7 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
                     disabled={steps.length <= 1}
                     onClick={() => {
                       if (safeStepIndex >= steps.length - 1) {
-                        setStepIndex(0);
+                        onChangeStepIndex(0);
                       }
                       setIsPlaying((prev) => !prev);
                     }}
@@ -601,7 +455,7 @@ export const VisualizerTab: React.FC<VisualizerTabProps> = ({
                   Live Memory Table
                 </h3>
                 <span className="text-xs text-[#8E8E8E] mt-0.5">
-                  Active stack variables detected from your code
+                  Active stack variables in your program
                 </span>
               </div>
 

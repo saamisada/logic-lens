@@ -1,53 +1,39 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Bookmark, ChevronDown, ChevronUp, Play, Search } from 'lucide-react';
-import { CONCEPTS } from '@/src/data/concepts';
-import type { DeviceProfile, ProgramLanguage } from '@/src/types/algorithm';
+import { Bookmark, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import type {
+  ConceptCard,
+  DeviceProfile,
+  ProgramLanguage,
+} from '@/src/types/algorithm';
 
 interface LibraryTabProps {
   profile: DeviceProfile;
+  language: ProgramLanguage;
+  concepts: ConceptCard[];
   bookmarkedIds: string[];
   onToggleBookmark: (conceptId: string) => void;
-  onLoadSnippetInVisualizer: (language: ProgramLanguage, code: string) => void;
+  onJumpToStepInVisualizer: (stepIndex: number) => void;
 }
-
-const CATEGORIES = [
-  'All',
-  'C Programming',
-  'Data Structures',
-  'Complexity',
-  'Data Science',
-] as const;
 
 export const LibraryTab: React.FC<LibraryTabProps> = ({
   profile,
+  language,
+  concepts,
   bookmarkedIds,
   onToggleBookmark,
-  onLoadSnippetInVisualizer,
+  onJumpToStepInVisualizer,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [searchQuery, setSearchQuery] = useState('');
   const [onlyBookmarked, setOnlyBookmarked] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(CONCEPTS[0].id);
+  const [expandedId, setExpandedId] = useState<string | null>(
+    concepts[0]?.id ?? null
+  );
 
-  const filteredConcepts = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return CONCEPTS.filter((card) => {
-      if (selectedCategory !== 'All' && card.category !== selectedCategory) {
-        return false;
-      }
-      if (onlyBookmarked && !bookmarkedIds.includes(card.id)) {
-        return false;
-      }
-      if (!q) return true;
-      return (
-        card.title.toLowerCase().includes(q) ||
-        card.summary.toLowerCase().includes(q) ||
-        card.category.toLowerCase().includes(q)
-      );
-    });
-  }, [selectedCategory, searchQuery, onlyBookmarked, bookmarkedIds]);
+  const visibleConcepts = useMemo(() => {
+    if (!onlyBookmarked) return concepts;
+    return concepts.filter((c) => bookmarkedIds.includes(c.id));
+  }, [concepts, onlyBookmarked, bookmarkedIds]);
 
   const gridClass =
     profile === 'desktop'
@@ -58,79 +44,46 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header & Filter Bar */}
-      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="space-y-0.5">
-            <h2 className="text-base font-semibold text-white">
-              Concept & Pattern Library
-            </h2>
-            <p className="text-xs text-[#8E8E8E] tabular-nums">
-              Python & C fundamentals · {bookmarkedIds.length} bookmarked
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setOnlyBookmarked((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors min-h-[36px] whitespace-nowrap shrink-0 self-start sm:self-auto ${
-              onlyBookmarked
-                ? 'bg-white text-[#141414] border-white'
-                : 'bg-[#2E2E2E] text-white border-[#454545] hover:bg-[#3A3A3A]'
-            }`}
-          >
-            <Bookmark className="w-3.5 h-3.5" />
-            <span>Saved Only</span>
-          </button>
+      {/* Header Bar */}
+      <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-0.5">
+          <h2 className="text-base font-semibold text-white">
+            Program Concept Library
+          </h2>
+          <p className="text-xs text-[#8E8E8E]">
+            {concepts.length} concept breakdown{concepts.length === 1 ? '' : 's'}{' '}
+            extracted directly from your {language} playground program
+          </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#8E8E8E] absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search concepts, pointers, Big-O, dicts..."
-              className="w-full rounded-xl bg-[#141414] border border-[#2E2E2E] pl-9 pr-3 py-2 text-xs text-white placeholder-[#8E8E8E] focus:outline-none focus:border-white"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {CATEGORIES.map((cat) => {
-              const active = selectedCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-colors min-h-[34px] ${
-                    active
-                      ? 'bg-white text-[#141414]'
-                      : 'bg-[#141414] text-[#A3A3A3] border border-[#2E2E2E] hover:text-white hover:bg-[#2A2A2A]'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setOnlyBookmarked((prev) => !prev)}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium border transition-colors whitespace-nowrap shrink-0 self-start sm:self-auto ${
+            onlyBookmarked
+              ? 'bg-white text-[#141414] border-white'
+              : 'bg-[#2E2E2E] text-white border-[#454545] hover:bg-[#3A3A3A]'
+          }`}
+        >
+          <Bookmark className="w-3.5 h-3.5" />
+          <span>Saved Only</span>
+        </button>
       </div>
 
-      {/* Adaptive Grid of Concept Cards */}
-      {filteredConcepts.length === 0 ? (
+      {/* Concept Cards Grid */}
+      {visibleConcepts.length === 0 ? (
         <div className="rounded-2xl bg-[#1F1F1F] border border-[#2E2E2E] p-8 text-center space-y-2">
           <p className="text-sm font-medium text-white">
-            No matching concept cards
+            No saved concept cards yet
           </p>
           <p className="text-xs text-[#8E8E8E]">
-            Clear your search or bookmark filter to view all concept guides.
+            Bookmark any concept card from your program or disable the Saved
+            Only filter.
           </p>
         </div>
       ) : (
         <div className={gridClass}>
-          {filteredConcepts.map((card) => {
+          {visibleConcepts.map((card) => {
             const isBookmarked = bookmarkedIds.includes(card.id);
             const isExpanded =
               profile === 'desktop' || expandedId === card.id;
@@ -214,15 +167,12 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                   <button
                     type="button"
                     onClick={() =>
-                      onLoadSnippetInVisualizer(
-                        card.snippetLanguage,
-                        card.snippet
-                      )
+                      onJumpToStepInVisualizer(card.targetStepIndex)
                     }
                     className="w-full rounded-full bg-white text-[#141414] hover:bg-[#E5E5E5] py-2.5 px-4 text-xs font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
                   >
                     <Play className="w-3.5 h-3.5" />
-                    <span>Load {card.snippetLanguage} in Visualizer</span>
+                    <span>Inspect in Visualizer</span>
                   </button>
                 </div>
               </article>

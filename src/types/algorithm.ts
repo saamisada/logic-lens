@@ -70,23 +70,17 @@ export interface TraceResult {
   truncated?: boolean;
 }
 
-export interface StarterSnippet {
-  id: string;
-  label: string;
-  language: ProgramLanguage;
-  code: string;
-}
-
 export interface ConceptCard {
   id: string;
   title: string;
-  category: 'C Programming' | 'Data Structures' | 'Complexity' | 'Data Science';
+  category: string;
   readTime: string;
   summary: string;
   details: string[];
   snippetLanguage: ProgramLanguage;
   snippet: string;
   takeaway: string;
+  targetStepIndex: number;
 }
 
 export interface QuizQuestion {
@@ -98,12 +92,29 @@ export interface QuizQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  targetStepIndex: number;
 }
 
-export interface DailyActivityEntry {
-  date: string;
-  label: string;
-  steps: number;
+export interface LineExecutionStat {
+  lineNumber: number;
+  code: string;
+  hits: number;
+}
+
+export interface VariableMutationStat {
+  name: string;
+  type: string;
+  mutations: number;
+  finalValue: string;
+}
+
+export interface ProgramAnalysis {
+  concepts: ConceptCard[];
+  quizzes: QuizQuestion[];
+  lineStats: LineExecutionStat[];
+  variableStats: VariableMutationStat[];
+  nonEmptyLines: number;
+  hottestLine: number;
 }
 
 export interface StudentAnalytics {
@@ -111,12 +122,6 @@ export interface StudentAnalytics {
   tracesRun: number;
   pythonTraces: number;
   cTraces: number;
-  quizzesAttempted: number;
-  quizzesCorrect: number;
-  completedQuizIds: string[];
   answeredQuizMap: Record<string, number>;
   bookmarkedConceptIds: string[];
-  streakDays: number;
-  lastActiveDate: string;
-  dailyActivity: Record<string, number>;
 }

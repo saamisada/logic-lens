@@ -2,6 +2,7 @@
 
 LogicLens is an adaptive **Python and C** Code Dry-Run Visualizer built as a Progressive Web Application (PWA). Students and developers select **Python** or **C**, paste any program directly into the editor, and automatically inspect line-by-line execution, memory array states, index pointer badges, variable mutations, `stdout` console output, and runtime complexity metrics.
 
+Live Preview: https://logiclens-bysada.vercel.app  
 Repository: https://github.com/saamisada/logic-lens
 
 ## 1. Core Capabilities

@@ -239,6 +239,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </span>
             </div>
             <div className="font-mono text-[11px] text-[#8E8E8E]">
+              logiclens-bysada.vercel.app
+            </div>
+            <div className="font-mono text-[11px] text-[#8E8E8E]">
               github.com/saamisada/logic-lens
             </div>
           </section>

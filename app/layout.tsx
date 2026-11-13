@@ -21,6 +21,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://logiclens-bysada.vercel.app'),
   title: 'LogicLens — Python & C Dry-Run Visualizer',
   description:
     'Adaptive Python and C Code Dry-Run Visualizer and Memory Inspector.',
@@ -42,6 +43,7 @@ export const metadata: Metadata = {
     title: 'LogicLens',
     description:
       'Adaptive Python and C Code Dry-Run Visualizer and Memory Inspector.',
+    url: 'https://logiclens-bysada.vercel.app',
     type: 'website',
   },
   twitter: {

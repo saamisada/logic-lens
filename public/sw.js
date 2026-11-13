@@ -1,6 +1,5 @@
-const CACHE_NAME = 'logiclens-cache-v1';
-const CORE_ASSETS = [
-  '/',
+const CACHE_NAME = 'logiclens-cache-v2';
+const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192.svg',
   '/icon-512.svg',
@@ -12,7 +11,7 @@ const CORE_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(CORE_ASSETS).catch(() => Promise.resolve());
+      return cache.addAll(STATIC_ASSETS).catch(() => Promise.resolve());
     })
   );
   self.skipWaiting();
@@ -20,17 +19,21 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        )
       )
-    )
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
+// Network-first strategy so SSR HTML and client JS chunks always stay in sync online,
+// while falling back to cached assets when completely offline.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -38,34 +41,22 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML navigations so fresh builds load immediately, falling back to cache offline
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
+  // Never cache Next.js HMR / internal dev endpoints
+  if (url.pathname.startsWith('/_next/webpack-hmr')) return;
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (
+          response &&
+          response.status === 200 &&
+          !url.pathname.startsWith('/_next/')
+        ) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request).then((res) => res || caches.match('/')))
-    );
-    return;
-  }
-
-  // Cache-first with background refresh for static assets
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetchPromise = fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-
-      return cached || fetchPromise;
-    })
+        }
+        return response;
+      })
+      .catch(() => caches.match(request).then((cached) => cached || caches.match('/')))
   );
 });

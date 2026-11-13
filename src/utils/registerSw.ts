@@ -6,6 +6,7 @@ export function registerServiceWorker(): void {
   const register = () => {
     navigator.serviceWorker
       .register('/sw.js', { scope: '/' })
+      .then((reg) => reg.update().catch(() => undefined))
       .catch(() => {
         // Silently ignore registration errors in restricted preview iframes
       });
